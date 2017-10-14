@@ -550,6 +550,6 @@ var InfoModel = IANAInfoModel{
 	ElementKey{0, 431}:   InfoElementEntry{FieldID: 431, Name: "layer2FrameTotalCount", Type: FieldTypes["unsigned64"]},
 	ElementKey{0, 432}:   InfoElementEntry{FieldID: 432, Name: "pseudoWireDestinationIPv4Address", Type: FieldTypes["ipv4Address"]},
 	ElementKey{0, 433}:   InfoElementEntry{FieldID: 433, Name: "ignoredLayer2FrameTotalCount", Type: FieldTypes["unsigned64"]},
-	ElementKey{0, 56701}: InfoElementEntry{FieldID: 56701, Name: "paloAltoAppName", Type: FieldTypes["string"]},
-	ElementKey{0, 56702}: InfoElementEntry{FieldID: 56702, Name: "paloAltoUserId", Type: FieldTypes["string"]},
+	ElementKey{0, 56701}: InfoElementEntry{FieldID: 56701, Name: "paloAltoAppName", Type: FieldTypes["octetArray"]},
+	ElementKey{0, 56702}: InfoElementEntry{FieldID: 56702, Name: "paloAltoUserId", Type: FieldTypes["octetArray"]},
 }
