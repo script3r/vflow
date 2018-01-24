@@ -80,16 +80,17 @@ The default configuration file is /etc/vflow/mq.conf, you can be able to change 
 ## Configuration Keys
 The Kafka configuration contains the following key
 
-|Key                  | Default |  Environment variable    | Description                                                      |
-|---------------------| --------|--------------------------|------------------------------------------------------------------|
-|brokers              | -       | VFLOW_KAFKA_BROKERS      | kafka broker addresses                                           |
-|compression          | none    | VFLOW_KAFKA_COMPRESSION  | compression codecs: gzip, snappy, lz4                            |
-|retry-max            | 2       | VFLOW_KAFKA_RETRY_MAX    | the total number of times to retry                               |
-|retry-backoff        | 10      | VFLOW_KAFKA_RETRY_BACKOFF| wait for leader election to occur before retrying in milliseconds|
-|tls-cert             | none    | VFLOW_KAFKA_TLS_CERT     | certificate file for client authentication                       |
-|tls-key              | none    | VFLOW_KAFKA_TLS_KEY      | key file for client authentication                               |
-|ca-file              | none    | VFLOW_KAFKA_CA_FILE      | certificate authority file for TLS client authentication         |
-|verify-ssl           | true    | VFLOW_KAFKA_VERIFY_SSL   | verify ssl certificates chain                                    |
+|Key                  | Default     |  Environment variable        | Description                                                                        |
+|---------------------| ------------|------------------------------|------------------------------------------------------------------------------------|
+|brokers              | -           | VFLOW_KAFKA_BROKERS          | kafka broker addresses                                                             |
+|compression          | none        | VFLOW_KAFKA_COMPRESSION      | compression codecs: gzip, snappy, lz4                                              |
+|retry-max            | 2           | VFLOW_KAFKA_RETRY_MAX        | the total number of times to retry                                                 |
+|request-size-max     | 104857600   | VFLOW_KAFKA_REQUEST_SIZE_MAX | the maximum size (in bytes) of any request that will be attempted to send to Kafka |
+|retry-backoff        | 10          | VFLOW_KAFKA_RETRY_BACKOFF    | wait for leader election to occur before retrying in milliseconds                  |
+|tls-cert             | none        | VFLOW_KAFKA_TLS_CERT         | certificate file for client authentication                                         |
+|tls-key              | none        | VFLOW_KAFKA_TLS_KEY          | key file for client authentication                                                 |
+|ca-file              | none        | VFLOW_KAFKA_CA_FILE          | certificate authority file for TLS client authentication                           |
+|verify-ssl           | true        | VFLOW_KAFKA_VERIFY_SSL       | verify ssl certificates chain                                                      |
 
 ## Example
 ```
@@ -133,3 +134,26 @@ The NATS configuration contains the following key
 |Key                  | Default               |  Environment variable    | Description                                                      |
 |---------------------| ----------------------|--------------------------|------------------------------------------------------------------|
 |url                  | nats://localhost:4222 | NA                       | URL addresse     
+
+# Raw Socket Configuration
+
+Note that for messages sent over TCP and UDP using this producer, the message deliminator is a new line character ("\n").
+
+## Format
+A config file is a plain text file in [YAML](https://en.wikipedia.org/wiki/YAML) format.
+
+```
+key: value
+```
+
+The default configuration file is /etc/vflow/mq.conf, you can be able to change it through vFlow configuration.
+
+
+## Configuration Keys
+The NATS configuration contains the following key
+
+|Key                  | Default               |  Environment variable    | Description                                                          |
+|---------------------| ----------------------|--------------------------|----------------------------------------------------------------------|
+|url                  | localhost:9555        | NA                       | URL address to send to. Includes the hostname and port.              |     
+|protocol             | tcp                   | NA                       | Protocol to use to send. Can be either "tcp" or "udp"                |
+|retry-max            | 2                     | NA                       | The number of times a message will be retried before giving up on it |     

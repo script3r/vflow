@@ -336,8 +336,8 @@ func (d *Decoder) decodeData(tr TemplateRecord) ([]DecodedField, error) {
 		}]
 
 		if !ok {
-			return nil, fmt.Errorf("Netflow element key (%d) not exist",
-				tr.FieldSpecifiers[i].ElementID)
+			return nil, nonfatalError(fmt.Errorf("Netflow element key (%d) not exist",
+				tr.FieldSpecifiers[i].ElementID))
 		}
 
 		fields = append(fields, DecodedField{
@@ -358,8 +358,8 @@ func (d *Decoder) decodeData(tr TemplateRecord) ([]DecodedField, error) {
 		}]
 
 		if !ok {
-			return nil, fmt.Errorf("Netflow element key (%d) not exist (scope)",
-				tr.ScopeFieldSpecifiers[i].ElementID)
+			return nil, nonfatalError(fmt.Errorf("Netflow element key (%d) not exist (scope)",
+				tr.ScopeFieldSpecifiers[i].ElementID))
 		}
 
 		fields = append(fields, DecodedField{
@@ -435,16 +435,9 @@ func (d *Decoder) decodeSet(mem MemCache, msg *Message) error {
 	}
 
 	// the next set should be greater than 4 bytes otherwise that's padding
-	for err == nil && setHeader.Length > uint16(d.reader.ReadCount()-startCount) && d.reader.Len() > 4 {
+	for err == nil && (int(setHeader.Length)-(d.reader.ReadCount()-startCount) > 4) && d.reader.Len() > 4 {
 		if setId := setHeader.FlowSetID; setId == 0 || setId == 1 {
 			// Template record or template option record
-
-			// Check if only padding is left in this set. A template id of zero indicates padding bytes, which MUST be zero.
-			templateId, err := d.reader.PeekUint16()
-			if err == nil && templateId == 0 {
-				break
-			}
-
 			tr := TemplateRecord{}
 			if setId == 0 {
 				err = tr.unmarshal(d.reader)
@@ -469,7 +462,7 @@ func (d *Decoder) decodeSet(mem MemCache, msg *Message) error {
 
 	// Skip the rest of the set in order to properly continue with the next set
 	// This is necessary if the set is padded, has a reserved set ID, or a nonfatal error occurred
-	leftoverBytes := setHeader.Length - uint16(d.reader.ReadCount()-startCount)
+	leftoverBytes := int(setHeader.Length) - (d.reader.ReadCount() - startCount)
 	if leftoverBytes > 0 {
 		_, skipErr := d.reader.Read(int(leftoverBytes))
 		if skipErr != nil {
