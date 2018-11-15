@@ -29,6 +29,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"path"
 	"runtime"
 	"strconv"
 	"strings"
@@ -40,6 +41,8 @@ var (
 	version    string
 	maxWorkers = runtime.NumCPU() * 1e4
 )
+
+type arrUInt32Flags []uint32
 
 // Options represents options
 type Options struct {
@@ -58,16 +61,18 @@ type Options struct {
 	StatsHTTPPort string `yaml:"stats-http-port"`
 
 	// sFlow options
-	SFlowEnabled bool   `yaml:"sflow-enabled"`
-	SFlowPort    int    `yaml:"sflow-port"`
-	SFlowUDPSize int    `yaml:"sflow-udp-size"`
-	SFlowWorkers int    `yaml:"sflow-workers"`
-	SFlowTopic   string `yaml:"sflow-topic"`
+	SFlowEnabled    bool           `yaml:"sflow-enabled"`
+	SFlowPort       int            `yaml:"sflow-port"`
+	SFlowUDPSize    int            `yaml:"sflow-udp-size"`
+	SFlowWorkers    int            `yaml:"sflow-workers"`
+	SFlowTopic      string         `yaml:"sflow-topic"`
+	SFlowTypeFilter arrUInt32Flags `yaml:"sflow-type-filter"`
 
 	// IPFIX options
 	IPFIXEnabled       bool   `yaml:"ipfix-enabled"`
 	IPFIXRPCEnabled    bool   `yaml:"ipfix-rpc-enabled"`
 	IPFIXPort          int    `yaml:"ipfix-port"`
+	IPFIXAddr          string `yaml:"ipfix-addr"`
 	IPFIXUDPSize       int    `yaml:"ipfix-udp-size"`
 	IPFIXWorkers       int    `yaml:"ipfix-workers"`
 	IPFIXTopic         string `yaml:"ipfix-topic"`
@@ -87,12 +92,31 @@ type Options struct {
 	// producer
 	MQName       string `yaml:"mq-name"`
 	MQConfigFile string `yaml:"mq-config-file"`
+
+	VFlowConfigPath string
 }
 
 func init() {
 	if version == "" {
 		version = "unknown"
 	}
+}
+
+func (a *arrUInt32Flags) String() string {
+	return "SFlow Type string"
+}
+
+func (a *arrUInt32Flags) Set(value string) error {
+	arr := strings.Split(value, ",")
+	for _, v := range arr {
+		v64, err := strconv.ParseUint(v, 10, 32)
+		if err != nil {
+			return err
+		}
+		*a = append(*a, uint32(v64))
+	}
+
+	return nil
 }
 
 // NewOptions constructs new options
@@ -109,11 +133,12 @@ func NewOptions() *Options {
 		StatsHTTPPort: "8081",
 		StatsHTTPAddr: "",
 
-		SFlowEnabled: true,
-		SFlowPort:    6343,
-		SFlowUDPSize: 1500,
-		SFlowWorkers: 200,
-		SFlowTopic:   "vflow.sflow",
+		SFlowEnabled:    true,
+		SFlowPort:       6343,
+		SFlowUDPSize:    1500,
+		SFlowWorkers:    200,
+		SFlowTopic:      "vflow.sflow",
+		SFlowTypeFilter: []uint32{},
 
 		IPFIXEnabled:       true,
 		IPFIXRPCEnabled:    true,
@@ -134,7 +159,9 @@ func NewOptions() *Options {
 		NetflowV9TplCacheFile: "/tmp/netflowv9.templates",
 
 		MQName:       "kafka",
-		MQConfigFile: "/etc/vflow/mq.conf",
+		MQConfigFile: "mq.conf",
+
+		VFlowConfigPath: "/etc/vflow",
 	}
 }
 
@@ -144,6 +171,11 @@ func GetOptions() *Options {
 
 	opts.vFlowFlagSet()
 	opts.vFlowVersion()
+
+	if opts.Verbose {
+		opts.Logger.Printf("the full logging enabled")
+		opts.Logger.SetFlags(log.LstdFlags | log.Lshortfile)
+	}
 
 	if opts.LogFile != "" {
 		f, err := os.OpenFile(opts.LogFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
@@ -161,7 +193,7 @@ func GetOptions() *Options {
 	opts.vFlowPIDWrite()
 
 	opts.Logger.Printf("Welcome to vFlow v.%s Apache License 2.0", version)
-	opts.Logger.Printf("Copyright (C) 2017 Verizon. github.com/VerizonDigital/vflow")
+	opts.Logger.Printf("Copyright (C) 2018 Verizon. github.com/VerizonDigital/vflow")
 
 	return opts
 }
@@ -269,11 +301,13 @@ func (opts *Options) vFlowFlagSet() {
 	flag.IntVar(&opts.SFlowUDPSize, "sflow-max-udp-size", opts.SFlowUDPSize, "sflow maximum UDP size")
 	flag.IntVar(&opts.SFlowWorkers, "sflow-workers", opts.SFlowWorkers, "sflow workers number")
 	flag.StringVar(&opts.SFlowTopic, "sflow-topic", opts.SFlowTopic, "sflow topic name")
+	flag.Var(&opts.SFlowTypeFilter, "sflow-type-filter", "sflow type filter")
 
 	// ipfix options
 	flag.BoolVar(&opts.IPFIXEnabled, "ipfix-enabled", opts.IPFIXEnabled, "enable/disable IPFIX listener")
 	flag.BoolVar(&opts.IPFIXRPCEnabled, "ipfix-rpc-enabled", opts.IPFIXRPCEnabled, "enable/disable RPC IPFIX")
 	flag.IntVar(&opts.IPFIXPort, "ipfix-port", opts.IPFIXPort, "IPFIX port number")
+	flag.StringVar(&opts.IPFIXAddr, "ipfix-addr", opts.IPFIXAddr, "IPFIX IP address to bind to")
 	flag.IntVar(&opts.IPFIXUDPSize, "ipfix-max-udp-size", opts.IPFIXUDPSize, "IPFIX maximum UDP size")
 	flag.IntVar(&opts.IPFIXWorkers, "ipfix-workers", opts.IPFIXWorkers, "IPFIX workers number")
 	flag.StringVar(&opts.IPFIXTopic, "ipfix-topic", opts.IPFIXTopic, "ipfix topic name")
@@ -318,11 +352,12 @@ func (opts *Options) vFlowFlagSet() {
 }
 
 func vFlowLoadCfg(opts *Options) {
-	var file = "/etc/vflow/vflow.conf"
+	var file = path.Join(opts.VFlowConfigPath, "vflow.conf")
 
 	for i, flag := range os.Args {
 		if flag == "-config" {
 			file = os.Args[i+1]
+			opts.VFlowConfigPath, _ = path.Split(file)
 			break
 		}
 	}

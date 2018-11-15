@@ -34,8 +34,8 @@ import (
 // Monitor is an interface to store system
 // and netflow statistics
 type Monitor interface {
-	System() error
-	Netflow() error
+	System(string) error
+	Netflow(string) error
 }
 
 // IPFIX represents IPFIX metrics
@@ -59,7 +59,7 @@ type SFlow struct {
 	Workers      int64
 }
 
-// Netflow9 represents Netflow9 metrics
+// NetflowV9 represents Netflow v9 metrics
 type NetflowV9 struct {
 	UDPQueue     int64
 	MessageQueue int64
@@ -143,14 +143,14 @@ func (c *Client) Post(url string, cType, query string) ([]byte, error) {
 	return body, nil
 }
 
-func getFlow(host string) (*Flow, *Flow, error) {
-	lastFlowFile := "/tmp/vflow.mon.lastflow"
+func getFlow(vhost, host string) (*Flow, *Flow, error) {
+	lastFlowFile := "/tmp/vflow.mon.lastflow." + host
 
 	flow := new(Flow)
 	lastFlow := new(Flow)
 
 	client := NewHTTP()
-	err := client.Get(host+"/flow", flow)
+	err := client.Get(vhost+"/flow", flow)
 	if err != nil {
 		return nil, nil, err
 	}

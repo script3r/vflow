@@ -26,12 +26,12 @@ import (
 	"bytes"
 	"encoding/json"
 	"net"
+	"path"
 	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
 
-	"github.com/VerizonDigital/vflow/packet"
 	"github.com/VerizonDigital/vflow/producer"
 	"github.com/VerizonDigital/vflow/sflow"
 )
@@ -114,7 +114,7 @@ func (s *SFlow) run() {
 	go func() {
 		p := producer.NewProducer(opts.MQName)
 
-		p.MQConfigFile = opts.MQConfigFile
+		p.MQConfigFile = path.Join(opts.VFlowConfigPath, opts.MQConfigFile)
 		p.MQErrorCount = &s.stats.MQErrorCount
 		p.Logger = logger
 		p.Chan = sFlowMQCh
@@ -158,7 +158,6 @@ func (s *SFlow) shutdown() {
 
 func (s *SFlow) sFlowWorker(wQuit chan struct{}) {
 	var (
-		filter = []uint32{sflow.DataCounterSample}
 		reader *bytes.Reader
 		msg    SFUDPMsg
 		ok     bool
@@ -183,29 +182,14 @@ LOOP:
 		}
 
 		reader = bytes.NewReader(msg.body)
-		d := sflow.NewSFDecoder(reader, filter)
-		records, err := d.SFDecode()
-		if err != nil || len(records) < 1 {
+		d := sflow.NewSFDecoder(reader, opts.SFlowTypeFilter)
+		datagram, err := d.SFDecode()
+		if err != nil || len(datagram.Samples) < 1 {
 			sFlowBuffer.Put(msg.body[:opts.SFlowUDPSize])
 			continue
 		}
 
-		decodedMsg := sflow.Message{}
-
-		for _, data := range records {
-			switch data.(type) {
-			case *packet.Packet:
-				decodedMsg.Packet = data.(*packet.Packet)
-			case *sflow.ExtSwitchData:
-				decodedMsg.ExtSWData = data.(*sflow.ExtSwitchData)
-			case *sflow.FlowSample:
-				decodedMsg.Sample = data.(*sflow.FlowSample)
-			case *sflow.SFDatagram:
-				decodedMsg.Header = data.(*sflow.SFDatagram)
-			}
-		}
-
-		b, err = json.Marshal(decodedMsg)
+		b, err = json.Marshal(datagram)
 		if err != nil {
 			sFlowBuffer.Put(msg.body[:opts.SFlowUDPSize])
 			logger.Println(err)
